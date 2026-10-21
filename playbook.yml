@@ -1,8 +1,117 @@
 ---
-- name: Prepare application servers
+- name: Prepare and deploy application servers
   hosts: all
   become: true
+  serial: 1
 
   roles:
     - role: geerlingguy.pip
+      tags:
+        - prepare
     - role: geerlingguy.docker
+      tags:
+        - prepare
+
+  tasks:
+    - name: Validate deployment secrets
+      ansible.builtin.assert:
+        that:
+          - (redmine_db_password | length) > 0
+          - (redmine_secret_key_base | length) >= 64
+          - redmine_db_password == (redmine_db_password | trim)
+          - >-
+            (redmine_db_password |
+            regex_search(redmine_db_password_forbidden_pattern)) is none
+          - "'\n' not in redmine_db_password"
+          - "'\r' not in redmine_db_password"
+          - "'\n' not in redmine_secret_key_base"
+          - "'\r' not in redmine_secret_key_base"
+        fail_msg: >-
+          Export REDMINE_DB_PASSWORD and REDMINE_SECRET_KEY_BASE. The database
+          password must not have surrounding whitespace, quotes, backslashes,
+          or line breaks.
+      tags:
+        - deploy
+
+    - name: Create Redmine directories
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - path: "{{ redmine_app_dir }}"
+          mode: "0755"
+        - path: "{{ redmine_certs_dir }}"
+          mode: "0755"
+      tags:
+        - deploy
+
+    - name: Download Yandex Cloud PostgreSQL root certificate
+      ansible.builtin.get_url:
+        url: "{{ redmine_root_ca_url }}"
+        dest: "{{ redmine_root_ca_path }}"
+        owner: root
+        group: root
+        mode: "0644"
+      tags:
+        - deploy
+
+    - name: Create Redmine environment file
+      ansible.builtin.template:
+        src: templates/redmine.env.j2
+        dest: "{{ redmine_env_file }}"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+      diff: false
+      tags:
+        - deploy
+
+    - name: Create persistent Redmine files volume
+      community.docker.docker_volume:
+        name: "{{ redmine_files_volume }}"
+        state: present
+      tags:
+        - deploy
+
+    - name: Run Redmine container
+      community.docker.docker_container:
+        name: "{{ redmine_container_name }}"
+        image: "{{ redmine_image }}"
+        pull: missing
+        state: healthy
+        healthy_wait_timeout: 900
+        restart_policy: unless-stopped
+        env_file: "{{ redmine_env_file }}"
+        published_ports:
+          - "0.0.0.0:{{ redmine_port }}:3000"
+        volumes:
+          - "{{ redmine_files_volume }}:/usr/src/redmine/files"
+          - "{{ redmine_root_ca_path }}:{{ redmine_root_ca_container_path }}:ro"
+        healthcheck:
+          test:
+            - CMD-SHELL
+            - wget --quiet --spider http://127.0.0.1:3000/login || exit 1
+          interval: 10s
+          timeout: 5s
+          retries: 10
+          start_period: 180s
+      no_log: true
+      tags:
+        - deploy
+
+    - name: Check Redmine HTTP endpoint locally
+      ansible.builtin.uri:
+        url: "http://127.0.0.1:{{ redmine_port }}/login"
+        method: GET
+        status_code: 200
+        follow_redirects: safe
+      register: redmine_http_check
+      until: redmine_http_check.status == 200
+      retries: 12
+      delay: 5
+      tags:
+        - deploy
