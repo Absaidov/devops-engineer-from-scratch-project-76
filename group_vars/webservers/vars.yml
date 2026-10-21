@@ -1,0 +1,20 @@
+---
+redmine_port: 3000
+redmine_image: redmine:7.0.2-bookworm
+redmine_container_name: project-76-redmine
+redmine_app_dir: /opt/project-76/redmine
+redmine_certs_dir: "{{ redmine_app_dir }}/certs"
+redmine_env_file: "{{ redmine_app_dir }}/.env"
+redmine_files_volume: project-76-redmine-files
+
+redmine_db_host: c-c9qukd7b82r2dvo7se5p.rw.mdb.yandexcloud.net
+redmine_db_port: 6432
+redmine_db_name: project76
+redmine_db_username: project76
+redmine_db_password: "{{ vault_redmine_db_password }}"
+redmine_db_password_forbidden_pattern: "[\"\\\\]"
+redmine_secret_key_base: "{{ vault_redmine_secret_key_base }}"
+
+redmine_root_ca_url: https://storage.yandexcloud.net/cloud-certs/RootCA.pem
+redmine_root_ca_path: "{{ redmine_certs_dir }}/RootCA.pem"
+redmine_root_ca_container_path: /etc/redmine/RootCA.pem

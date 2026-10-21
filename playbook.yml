@@ -27,9 +27,11 @@
           - "'\n' not in redmine_secret_key_base"
           - "'\r' not in redmine_secret_key_base"
         fail_msg: >-
-          Export REDMINE_DB_PASSWORD and REDMINE_SECRET_KEY_BASE. The database
+          Set vault_redmine_db_password and vault_redmine_secret_key_base in
+          the encrypted group_vars/webservers/vault.yml file. The database
           password must not have surrounding whitespace, quotes, backslashes,
           or line breaks.
+      no_log: true
       tags:
         - deploy
 
