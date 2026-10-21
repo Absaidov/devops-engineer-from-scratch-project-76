@@ -18,8 +18,9 @@ Docker. Приложение работает на двух ВМ за Applicatio
 - Redmine `7.0.2`
 - Managed Service for PostgreSQL
 - Yandex Application Load Balancer
+- Datadog Agent 7 и интеграция HTTP Check
 - роли `geerlingguy.pip` и `geerlingguy.docker`
-- коллекция `community.docker`
+- коллекции `community.docker` и `datadog.dd`
 
 ## Требования
 
@@ -30,7 +31,7 @@ Docker. Приложение работает на двух ВМ за Applicatio
 - кластер PostgreSQL содержит базу и пользователя `project76`;
 - балансировщик направляет запросы на порт `3000` обеих ВМ.
 - создан зашифрованный файл `group_vars/webservers/vault.yml` с секретами
-  приложения.
+  приложения и мониторинга.
 
 ## Установка
 
@@ -163,6 +164,56 @@ make health
 
 После первой авторизации стандартной парой `admin` / `admin` Redmine потребует
 сменить пароль администратора.
+
+## Мониторинг
+
+Зарегистрируйтесь в Datadog и создайте **API key** в настройках организации.
+Для агента нужен именно API key, а не Application key. Значение API key нельзя
+добавлять в открытые файлы или историю команд.
+
+Параметр `datadog_site` в `group_vars/webservers/vars.yml` должен соответствовать
+адресу панели Datadog:
+
+- `https://app.datadoghq.com` — `datadoghq.com`;
+- `https://app.datadoghq.eu` — `datadoghq.eu`;
+- `https://us3.datadoghq.com` — `us3.datadoghq.com`;
+- для US5, AP1, AP2 и UK1 используется домен из адреса панели.
+
+По умолчанию настроен сайт `datadoghq.com` (US1). Добавьте API key в
+зашифрованный Vault-файл:
+
+```bash
+EDITOR=nano make vault-edit
+```
+
+Не удаляя существующие переменные, добавьте:
+
+```yaml
+vault_datadog_api_key: "<API key из Datadog>"
+```
+
+Установите новую коллекцию и настройте агент только на серверах группы
+`webservers`:
+
+```bash
+make install
+make monitoring
+```
+
+Проверить локальный `http_check` на обеих ВМ:
+
+```bash
+make monitoring-check
+```
+
+Каждый агент проверяет `http://127.0.0.1:3000/login`, поэтому результат отражает
+состояние конкретного экземпляра Redmine. В Datadog должны появиться две ВМ,
+service check `http.can_connect` и метрика `network.http.response_time`. Передача
+данных может занять несколько минут. Новые входящие правила группы безопасности
+не нужны: агент сам устанавливает исходящие HTTPS-соединения с Datadog.
+
+Команда `make deploy` по-прежнему запускает только приложение. Для изменения
+ключа используйте `make vault-edit`, затем повторно выполните `make monitoring`.
 
 ## Настройки балансировщика и HTTPS
 

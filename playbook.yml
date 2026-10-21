@@ -117,3 +117,22 @@
       delay: 5
       tags:
         - deploy
+
+    - name: Validate Datadog API key
+      ansible.builtin.assert:
+        that:
+          - (vault_datadog_api_key | default('') | trim | length) > 0
+        fail_msg: >-
+          Add vault_datadog_api_key to the encrypted
+          group_vars/webservers/vault.yml file.
+      when: "'webservers' in group_names"
+      no_log: true
+      tags:
+        - monitoring
+
+    - name: Install and configure Datadog Agent
+      ansible.builtin.import_role:
+        name: datadog.dd.agent
+      when: "'webservers' in group_names"
+      tags:
+        - monitoring

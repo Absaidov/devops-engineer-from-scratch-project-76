@@ -18,3 +18,32 @@ redmine_secret_key_base: "{{ vault_redmine_secret_key_base }}"
 redmine_root_ca_url: https://storage.yandexcloud.net/cloud-certs/RootCA.pem
 redmine_root_ca_path: "{{ redmine_certs_dir }}/RootCA.pem"
 redmine_root_ca_container_path: /etc/redmine/RootCA.pem
+
+datadog_api_key: "{{ vault_datadog_api_key }}"
+datadog_site: datadoghq.com
+datadog_agent_major_version: 7
+datadog_enabled: true
+datadog_remote_updates: false
+
+datadog_config:
+  tags:
+    - env:production
+    - service:redmine
+    - project:project-76
+
+datadog_checks:
+  http_check:
+    init_config: {}
+    instances:
+      - name: "redmine-{{ inventory_hostname }}"
+        url: "http://127.0.0.1:{{ redmine_port }}/login"
+        method: get
+        timeout: 5
+        http_response_status_code: 200
+        collect_response_time: true
+        include_content: false
+        skip_proxy: true
+        service: redmine
+        tags:
+          - env:production
+          - service:redmine

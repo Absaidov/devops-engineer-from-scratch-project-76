@@ -24,7 +24,7 @@ APP_URL ?= https://uit14.ru
 SSH_OPTIONS = -i "$(SSH_KEY)" -o IdentitiesOnly=yes
 SSH_CHECK_OPTIONS = $(SSH_OPTIONS) -o BatchMode=yes -o ConnectTimeout=10
 
-.PHONY: install deps setup prepare deploy health ping syntax check vault-create vault-edit vault-view ssh-vm-1 ssh-vm-2 ssh-check
+.PHONY: install deps setup prepare deploy health monitoring monitoring-check ping syntax check vault-create vault-edit vault-view ssh-vm-1 ssh-vm-2 ssh-check
 
 install:
 	$(GALAXY_ENV) $(ANSIBLE_GALAXY) install -r requirements.yml
@@ -38,6 +38,13 @@ prepare:
 
 deploy:
 	$(ANSIBLE_PLAYBOOK) -i "$(INVENTORY)" "$(PLAYBOOK)" $(VAULT_ARGS) --tags deploy
+
+monitoring:
+	$(ANSIBLE_PLAYBOOK) -i "$(INVENTORY)" "$(PLAYBOOK)" $(VAULT_ARGS) --tags monitoring
+
+monitoring-check:
+	$(ANSIBLE) webservers -i "$(INVENTORY)" $(VAULT_ARGS) --become \
+		-m ansible.builtin.command -a "datadog-agent check http_check"
 
 health:
 	$(ANSIBLE) webservers -i "$(INVENTORY)" $(VAULT_ARGS) -m ansible.builtin.command \
