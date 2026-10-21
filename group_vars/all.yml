@@ -3,5 +3,4 @@ pip_install_packages:
   - name: docker
     extra_args: --break-system-packages
 
-docker_users:
-  - "{{ ansible_user }}"
+docker_users: "{{ [ansible_user] if ansible_user is defined else [] }}"
